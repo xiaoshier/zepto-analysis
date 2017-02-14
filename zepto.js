@@ -16,6 +16,7 @@
     rootNodeRE = /^(?:body|html)$/i,
     capitalRE = /([A-Z])/g,
 
+
     // special attributes that should be get/set via method calls
     methodAttributes = ['val', 'css', 'html', 'text', 'data', 'width', 'height', 'offset'],
 
@@ -1646,5 +1647,5 @@ window.$ === undefined && (window.$ = Zepto)
     }
   }
 })()
-  return Zepto
+  return Zepto;
 }))
