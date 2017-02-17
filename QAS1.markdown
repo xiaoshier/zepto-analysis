@@ -34,7 +34,6 @@
   
 6. element.contains(selector) 是否包含 selector    
   
-7.   
   
 15. document.documentElement 获取根元素, 如 html文档中获取 html 元素  
         
@@ -47,6 +46,11 @@
 19. ele.childNodes    
     获得子级元素, 包括空格/换行符, 标签, 注释  
   
+
+20. innerHTML
+    
+        ele.innerHTML = '<div><a>'; => 给 ele 添加子级元素, div 与 a 是父子关系
+
 6. match = ~zepto.qsa(parent, selector).indexOf(element);    
     使用了按位非    
     ~-1 => 0, ~0 => -1, ~1 => -2, ~2 => -3  
@@ -78,9 +82,18 @@
   
 14. 运算优先级  
 
+    && 都为真时, 值为最后一个真值, 有一个假值时, 值为那个假值
+    || 都为假时, 值为最后一个假值, 有一个真值时, 值为那个真值, 碰到真值时, 停止往下计算
+
+    var test1 = a || b;  a 为 false || 0 || undefined || null 时, test1 => b; 否则 test1 => a
+    var test2 = a && b;  a 为 true  || 非0 数 || string 时, test2 => b; 否则 test2 = a;
+    var test3 = true || any && any test3 => 第一个值
+    
     a || b ? c : d
-    先运算 a || b 然后在执行 ? :
+    先运算 ? 前的值, 再进行 ? : 取值
+    
 
     var test = a ? b : c
     先进行a ? b : c 后进行 = 运算  
 
+15. 通过构造函数创建的是一个对象
