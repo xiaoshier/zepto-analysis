@@ -265,8 +265,8 @@
       }
     }
 
-    //创建 html 对象, 并添加 properties 属性
-    //返回这个对象
+    //返回 html中第一个标签对象, 并添加 properties 属性
+    //如 html 值为 '<div><a>)' 返回值为 div 的 nodeList
     zepto.fragment = function(html, name, properties) {
       var dom, nodes, container;
 
@@ -294,7 +294,10 @@
         }
 
         container = containers[name];
+        //添加 html 为 container 的子级
         container.innerHTML = '' + html;
+
+        //each 返回第一个参数, dom 的值为 container的子级的 nodeList
         dom = $.each(slice.call(container.childNodes), function(){
           container.removeChild(this);
         });
@@ -331,6 +334,12 @@
 
     //类似 jQuery 的`$.fn.init`
     //接受 selector 和一个可选参数 context
+    //selector: <div> 获取 div 对象
+    //selector: 'div', 获取 content / document 下的 div 对象
+    //selector: array, 返回该数组
+    //selector: object,返回 object
+    //selector: function, dom 加载结束后执行该函数
+    //
     zepto.init = function(selector, context) {
       var dom;
 
@@ -339,18 +348,22 @@
         return zepto.Z();
 
       //如果 selector 是` string`
+
       } else if (typeof selector == 'string') {
         selector = selector.trim();
 
         //如果选择器是一个html 片段, 以该标签创建对象
+        //selector: '<div>'
         if (selector[0] == '<' && fragmentRE.test(selector)) {
           dom = zepto.fragment(selector, RegExp.$1, context);
 
-        //如果 context 存在, 返回该 context 下的 select nodes
+          //selector: 'div', content: 标签, className, id 等
+          //获取 content 下的 selector 元素
         } else if (context !== undefined) {
             return $(context).find(selector);
 
-        //如果是 css 选择器, 则用它来选择 nodes
+          //selector: 'div', content 为undefined
+          //dom 为所有的 div对象
         } else {
             dom = zepto.qsa(document, selector);
         }
@@ -858,11 +871,13 @@
         })
       },
 
-      //???
+      //替换
       replaceWith: function(newContent) {
+        //给指定元素前面添加 newContent 元素, 然后再把 该指定元素删除
         return this.before(newContent).remove();
       },
 
+      // 给每个匹配的元素添加 structure父集
       wrap: function(structure) {
         var func = isFunction(structure);
         if (this[0] && !func) {
@@ -876,6 +891,127 @@
           )
         })
       },
+
+      //在第一个匹配元素前添加 structure 元素,
+      //并把把所有的匹配元素移到 structure 中, 成并列关系
+      wrapAll: function(structure) {
+        if (this[0]) {
+          $(this[0]).before(structure = $(structure));
+          var children;
+          //获取 structure 中最深层级对象
+          while ((children = structure.children()).length) {
+            structure = children.first();
+          }
+          //append 方法, 把匹配的元素从原来的节点中移除, 添加到目标节点中
+          $(structure).append(this);
+        }
+        return this;
+      },
+
+      //匹配元素内添加 structure
+      wrapInner: function(structure) {
+        var func = isFunction(structure);
+        return this.each(function(index) {
+          var self = $(this), contents = self.contents(),
+            dom = func ? structure.call(this, index) : structure;
+          contents.length ? contents.wrappAll(dom) : self.append(dom);
+        })
+      },
+
+      //去除直接父级
+      unwrap: function() {
+        this.parent().each(funtion() {
+          $(this).replaceWith($(this).children());
+        });
+      },
+
+      //深复制
+      clone: function() {
+        return this.map(function() {
+          return this.cloneNode(true);
+        });
+      },
+
+      hide: function() {
+        return this.css("display", "nonde");
+      },
+
+      show: function() {
+        return this.css("display", "none");
+      },
+
+      //setting 为 true 时, 显示; 为 false 时,隐藏
+      toggle: function(setting) {
+        return this.each(function() {
+          var el = $(this);
+          (setting === undefined ? el.css("display") === "none" : setting) ? el.show() :el.hide();
+        });
+      },
+
+      //获取拥有 selector 的上一元素
+      prev: function(selector) {
+        // ele.previousElementSibling 获取上一个元素
+        return $(this.pluck('previousElementSibling')).filter(selector || '*');
+      },
+
+      next: function(selector) {
+        return $(this.pluck('nextElementSibling')).filter(selecotr || '*');
+      },
+
+      //未传参数, 返回第一个元素的 html 内容
+      html: function(html) {
+        return 0 in arguments ? //arguments 为空
+          this.each(function(idx) {
+            var originHtml = this.innerHTML;
+            $(this).empty().append( funcArg(this, html, idx, originHtml) );
+          }) :
+          (0 in this ? this[0].innerHTML : null);
+      },
+
+      // 未传参数, 返回第一个匹配元素的 textContent 内容, 即该元素以及其所有子孙辈元素的 text 值
+      // 传入参数, 将匹配元素子级替换为参数
+      text: function(text) {
+        return 0 in arguments ?
+          this.each(function(idx) {
+            var newText = funcArg(this, text, idx, this.textContent);
+            this.textContent = newText == null ? '' : '' + newText;
+          }) :
+          (0 in this ? this[0] : null);
+      },
+
+      //获取 attr 值, 或者设置 attr 值
+      attr: function(name, value) {
+        var result;
+        return (typeof name == 'string' && !(1 in arguments)) ?
+          //获取 name 对应的属性值
+          (0 in this && this[0].nodeType == 1 && (result = this[0].getAttribute(name)) != null ? result : undefined) :
+          this.each(function(idx) {
+            if (this.nodeType !== 1) {
+              return
+            }
+            if (isObject(name)) {
+              for (var key in name) {
+                setArrtibute(this, key, name[key]);
+              }
+            } else {
+              setArrtibute(this, name, funcArg(this, value, idx, this.getAttribute(name)));
+            }
+          });
+      },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
