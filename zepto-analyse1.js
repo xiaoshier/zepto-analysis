@@ -5,7 +5,21 @@
   //this, function(window){}, 为两个参数
 
   //core
-  var Zepto = (function(){})();//8-939
+  var Zepto = (function(){
+    //获取元素, 创建元素
+    //一些添加给元素的方法
+
+    function Z() {}
+    $ = new Z();
+    $.fn ={
+      property1: value,
+      ...
+      property2: value
+    };
+    zepto.Z.prototype = Z.prototype = $.fn;
+    $.zepto = zepto;
+    return $;
+  })();//8-941
 
   window.Zepto = Zepto//941
   window.$ === undefined && (window.$ = Zepto)//942
@@ -143,7 +157,7 @@
       return isObject(obj) && !isWindow(obj) && Object.getPrototypeOf(obj) == Object.prototype;
     }
 
-    //类数组
+    //类数组, 如 nodeList
     //var obj {
     //1: 'a',
     //2: 'v',
@@ -215,7 +229,7 @@
 
         //new RegExp('(^|\\s)' + name + '(\\s|$)')
         ///(^|\s) (\s|$)
-        //| name |
+        // nsame /name
         classCache[name] : (classCache[name] = new RegExp('(^|\\s)' + name + '(\\s|$)'));
     }
 
@@ -255,7 +269,7 @@
         });
     }
 
-    //
+    // 构造函数, 添加参数到 this 对象上
     function Z(dom, selector) {
       var i, len = dom ? dom.length : 0;
       for (var i = 0; i < len; i++) {
@@ -264,6 +278,11 @@
         this.selector = selector || '';
       }
     }
+    //Z.prototype = $.fn;
+    //$ = function(dom, selector){
+    // new Z(dom, selector);
+    //}
+    //通过$获取的对象, 都具有$.fn 定义的方法和属性
 
     //返回 html中第一个标签对象, 并添加 properties 属性
     //如 html 值为 '<div><a>)' 返回值为 div 的 nodeList
@@ -303,6 +322,7 @@
         });
       }
 
+      //给标签添加属性以及属性的值
       if (isPlainObject(properties)) {
         nodes = $(dom);
         $.each(properties, function(key, value) {
@@ -323,7 +343,7 @@
     //给数组提供 Zepto 的所有方法
     //这个方法可以在插件中被覆盖
     zepto.Z = function(dom, selector) {
-      return new Z(dom, selector);
+      return new Z(dom, selector);//创建一个函数新的实例
     }
 
     //如果给定 object 是 Zepto 的集合返回 `true`
@@ -485,6 +505,7 @@
         }
       }
 
+    //返回 arg 的值
     function funcArg(context, arg, idx, payload) {
       return isFunction(arg) ? arg.call(context, idx, payload) : arg
     }
@@ -999,35 +1020,325 @@
           });
       },
 
+      removeAttr: function(name) {
+        return this.each(function() {
+          this.nodeType === 1 &&  name.split(' ').forEach(function(attribute) {
+            setAttribute(this, attribute);
+          }, this);
+        });
+      },
+
+      //设置或获取属性
+      prop: function(name, value) {
+        name = propMap[name] || name;
+        return (1 in arguments) ?
+          this.each(function(idx) {
+            this[name] = funcArg(this, value, idx, this[name])
+          }) :
+          (this[0] && this[0][name]);
+      },
+
+      removeProp: function(name) {
+        name = propMap[name] || name;
+        return this.each(function() {
+          delete this[name];
+        });
+      },
+
+      //添加'data-attr' 属性或读取属性
+      data: function(name, value) {
+        var attrName = 'data-' + name.replace(capitalRE, '-$1').toLowerCase();
+
+        var data = (1 in arguments) ?
+          this.attr(attrName, value) :
+          this.attr(attrName);
+
+        return data !== null ? deserializeValue(data) : undefined;
+      },
+
+      //设定或返回 val 值
+      val: function(value) {
+        if (0 in arguments) {
+          if (value == null) {
+            value = "";
+          }
+          return this.each(function(idx) {
+            this.value = funcArg(this, value, idx, this.value);
+          });
+        } else {
+          //如果是 <select  multiple> 标签, 返回多选的值
+          //否则返回第一个匹配元素的值
+          return this[0] && (this[0].multiple ?
+            $(this[0]).find('option').filter(function() { return this.selected }).pluck('value') :
+              this[0].value);
+        }
+      },
+
+      offset: function(coordinates) {
+        if (coordinates) {
+          return this.each(function(index) {
+            var $this = $(this),
+              coords = funcArg(this, coordinates, index, $this.offset()),
+              parentOffset = $this.offsetParent().offset(),
+              props = {
+                top: coords.top - parentOffset.top,
+                left: coords.left - parentOffset.left
+              };
+
+            if ($this.css('position') == 'static') {
+              props['position'] = 'relative';
+            }
+            $this.css(props);
+          })
+        }
+
+        if (!this.length) {
+          return null;
+        }
+        if (document.documentElement !== this[0] && !$.contains(document.ducomentElement, this[0])) {
+            return {top: 0, left: 0}
+        }
+        var obj = this[0].getBoundingClientRect();
+        return {
+          left: obj.left + window.pageXOffset,
+          top: obj.top + window.pageYOffset,
+          width: Math.round(obj.width),
+          height: Math.round(obj.height)
+        }
+      },
+
+      //添加或获得 css 属性
+      css: function(property, value) {
+        if (arguments.length < 2) {
+          var element = this[0];
+          if (typeof property == 'string') {
+            if (!element) {
+              return;
+            }
+            return element.style[camelize(property)] || getComputedStyle(element, '').getPropertyValue(property);
+          } else if (isArray(property)) {
+            if (!element) {
+              return
+            }
+            var props = {};
+            var computedStyle = getComputedStyle(element, '');
+            $.each(property, function(_, prop) {
+                props[prop] = (elemnt.style[camelize(prop)] || computedStyle.getPropertyValue(prop));
+            });
+            return props;
+          }
+        }
+
+        var css = '';
+        if (type(property) == 'string') {
+          if (!value && value !== 0) {
+            this.each(function() {
+              this.style.removeProperty(dasherize(property));
+            })
+          } else {
+            css = dashrize(property) + ":" + maybeAddPx(property, value);
+          }
+        } else {
+            for (key in property) {
+              if (!property[key] && property[key] !== 0) {
+                this.each(function() {
+                  this.style.removeProperty(dasherize(key))
+                })
+              } else {
+                css += dasherize(key) + ':' + maybeAddPx(key, property[key]) + ';'
+              }
+            }
+        }
+        return this.each(function() {
+          this.style.cssText += ';' + css;
+        });
+      },
 
 
+      //获取索引值
+      //获取当前元素在同级中的索引值
+      //获取传参的元素在匹配元素中的索引值
+      index: function(element) {
+        return element ? this.indexOf($(element)[0]) : this.parent().children().indexOf(this[0]);
+      },
+
+      //
+      hasClass: function(name) {
+        if (!name) {
+          return false;
+        }
+        return emptyArray.some.call(this, function(el) {
+          return this.test(className(el));//此处的 this 是指 classRE(name);
+        }, classRE(name))
+      },
+
+      //
+      addClass: function(name) {
+        if (!name) {
+          return this;
+        }
+        return this.each(function(idx) {
+            if (!('className' in this)) {
+              return
+            }
+          classList = [];
+          var cls = className(this), newName = funcArg(this, name, idx, cls);
+          newName.split(/\s+/g).forEach(function(klass) {
+            if (!$(this).hasClass(klass)) {//$(this) 指
+              classList.push(klass)
+            }
+          }, this);//this指代匹配元素
+          classList.length && className(this, cls, (cls ? " " : "") + classList.join(" "));
+        });
+      },
+
+      //移除 className, 若无参数, 返回 className 的值
+      removeClass: function(name) {
+        return this.each(function(idx) {
+          if (!('className' in this)) {
+            return;
+          }
+          if (name === undefined) {
+            return className(this, '');
+          }
+          classList = className(this);
+          funcArg(this, name, idx, classList).split(/\s+/g).forEach(function(klass) {
+            classList = classList.replace(classRE(klass), " ");
+          });
+          className(this, classList.trim());
+        });
+      },
+
+      //添加或删除类型
+      //true 添加
+      //false 删除
+      toggleClass: function(name, when) {
+        if (!name) return this;
+        return this.each(function(idx) {
+          var $this = $(this), names = funcArg(this, name, idx, className(this));
+          names.split(/\s+/g).forEach(function(klass) {
+            (when === undefined ? !$this.hasClass(klass) : when) ?
+              $this.addClass(klass) : $this.removeClass(klass)
+          });
+        });
+      },
+
+      scrollTop: function(value) {
+        if (!this.length) {
+          return;
+        }
+        var hasScrollTop = 'scrollTop' in this[0];
+        if (value === undefined) {
+          return hasScrollTop ? this[0].scrollTop : this[0].pageYOffset;
+        }
+        return this.each(hasScrollTop ?
+            function() { this.scrollTop = value } :
+            function() { this.scrollTo(this.scrollX, value) }
+        )
+      },
+
+      scrollLeft: function(value) {
+        if (!this.length) {
+          return
+        }
+        var hasScrollLeft = 'scrollLeft' in this[0];
+        if (value === undefined) {
+          return hasScrollLeft ? this[0].scrollLeft : this[0].pageXOffset;
+        }
+        return this.each(hasScrollLeft ?
+            function(){ this.scrollLeft = value } :
+            function(){ this.scrollTo(value, this.scrollY) });
+      },
+
+      position: function() {
+        if (!this.length) {
+          return;
+        }
+
+        var elem = this[0],
+          offsetParent = this.offsetParent(),
+          offset = this.offset(),
+          offset = this.offset(),
+          parentOffset = rootNodeRE.test(offsetParent[0].nodeName) ? { top: 0, left: 0 } : offsetParent.offset()
+
+        offset.top -= parseFloat( $(elem).css('margin-top') ) || 0;
+        offset.left -= parseFloat( $(elem).css('margin-left') ) || 0;
+
+        parentOffset.top += parseFloat( $(offsetParent[0]).css('border-top-width'))  || 0;
+        parentOffset.left -= parseFloat( $(offsetParent[0]).css('border-left-width') ) || 0;
+
+        return {
+          top: offset.top - parentOffset.top,
+          left: offset.left - parentOffset.left
+        }
+      },
+
+      offsetParent: function() {
+        return this.map(function() {
+          var parent = this.offsetParent || document.body;
+          while (parent && !rootNodeRE.test(parent.nodeName) && $(parent).css('position') == 'static') {
+            parent = parant.offsetParent;
+          }
+          return parent;
+        })
+      }
+    }//844
+
+    $.fn.detach = $.fn.remove;
 
 
+    //生成设置或获得宽高函数
+    ;['width', 'height'].forEach(function(dimension) {
+      var dimensionProperty =
+        dimension.replace(/./, function(m) {
+          return m[0].toUpperCase();
+        });
+
+      $.fn[dimension] = function(value) {
+        var offset, el = this[0];
+        //如果 value 值为 undefined
+        //返回元素的宽度或高度
+        //window 对象和 html 对象宽高
+        if (value === undefined) {
+          return isWindow(el) ? el['inner' + dimensionProperty] :
+            isDocument(el) ? el.documentElement['scroll' + dimensionProperty] :
+            (offset = this.offset()) && offset[dimension]
+        } else {
+          //给每个匹配元素设置宽高
+          //this 是指匹配元素的集合
+          return this.each(function(idx) {
+            el = $(this);//$(this) 是指循环的匹配元素对象
+            el.css(dimension, funcArg(this, value, idx, el[dimension]()));
+          })
+        }
+      }
+    });
 
 
+    function traverseNode(node, fun) {
+      fun(node);
+      for (var i = 0, len = node.childNodes.length; i < len.length; i++) {
+        traverseNode(node.childNodes[i], fun);
+      }
+    }
 
+    adjacencyOperators.forEach(function(operator, operatorIndex) {
 
+    })
 
+    zepto.Z.prototype = Z.prototype = $.fn;
 
+    zepto.uniq = uniq;
+    zepto.deserializeValue = deserializeValue;
+    $.zepto = zepto;
 
+    return $;
+  })();//941
 
-
-
-
-
-
-
-
-
-
-
-
-
-    }//842
-
-
-
-  })();//936
+  //设置全局变量, Zepto
+  window.Zepto = Zepto;
+  //如果没有全局变量$, 则设置全局变量$ 值为 Zepto
+  window.$ === undefined && (window.$ = Zepto);
 
 
 
