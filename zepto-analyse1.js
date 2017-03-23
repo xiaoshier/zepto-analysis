@@ -5,6 +5,8 @@
   //this, function(window){}, 为两个参数
 
   //core
+  //给 Zepto 赋值, 该值为立即执行函数返回的值 `$`
+  //无论在哪里定义了立即执行函数, js 引擎运行到该代码时, 该函数立即执行
   var Zepto = (function(){
     //获取元素, 创建元素
     //一些添加给元素的方法
@@ -22,6 +24,11 @@
   })();//8-941
 
   window.Zepto = Zepto//941
+
+  //首先执行最外层的立即执行函数, 先预编译了变量 Zepto, 然后开始执行 Zepto 的立即执行函数, 该函数返回的值赋值给 `Zepto`
+  //然后判断如果没有引入其他框架或者未使用`$`, 那么就给`$`赋值
+  //此处定义`$`函数
+  //如果$未被使用,那么定义$
   window.$ === undefined && (window.$ = Zepto)//942
 
   //event
@@ -37,6 +44,7 @@
 
   return Zepto;//1649
 }));
+
 
 (function(global, factory) {
   if (typeof define === 'function' && define.amd) {
@@ -1314,16 +1322,74 @@
       }
     });
 
-
     function traverseNode(node, fun) {
       fun(node);
-      for (var i = 0, len = node.childNodes.length; i < len.length; i++) {
+      for (var i = 0, len = node.childNodes.length; i < len; i++) {
         traverseNode(node.childNodes[i], fun);
       }
     }
 
+    //????
     adjacencyOperators.forEach(function(operator, operatorIndex) {
+      var inside = operatorIndex % 2;
 
+      $.fn[operator] = function() {
+        var argType, nodes = $.map(arguments, function(arg) {
+          var arr = [];
+          argType = type(arg);
+          if (argType == 'array') {
+            arg.forEach(function(el) {
+              if (el.nodeType !== undefined) {
+                return arr.push(el);
+              } else if ($.zepto.isZ(el)) {
+                return arr = arr.concat(el.get());
+              }
+            });
+            return arr;
+          }
+          return argType == 'object' || arg == null ?
+            arg : zepto.fragment(arg);
+        }),
+          parent, copyByClone = this.length > 1;
+        if (nodes.length < 1) {
+          return this;
+        }
+
+        return this.each(function(_, target) {
+          parent = inside ? target : target.parentNode;
+
+          target = operatorIndex == 0 ? target.nextSibling :
+            operatorIndex == 1 ? target.firstChild :
+            operatorIndex == 2 ? target :
+            null;
+
+          var parentInDocument = $.contains(docuemnt.documentElement, parent);
+
+          nodes.forEach(function(node) {
+            if (copyByClone) {
+              node = node.cloneNode(true);
+            } else if (!parent) {
+              return $(node).remove();
+            }
+
+            parent.insertBefore(node, target);
+            if (parentInDocument) {
+              traverseNode(node, function(el) {
+                if (el.nodeName != null && el.nodeName.toUpperCase() ==='SCRIPT' &&
+                (!el.type || el.type === 'text/javascript') && !el.src) {
+                  var target = el.ownerDocument ? el.ownerDocument.defaultView : window;
+                  target['eval'].call(target, el.innerHTML);
+                }
+              })
+            }
+          })
+        })
+      }
+
+      $.fn[inside ? operator + 'To' : 'insert' + (operatorInde ? 'Before' : 'After')] = function(html) {
+        $(html)[operator](this);
+        return this;
+      }
     })
 
     zepto.Z.prototype = Z.prototype = $.fn;
@@ -1340,6 +1406,98 @@
   //如果没有全局变量$, 则设置全局变量$ 值为 Zepto
   window.$ === undefined && (window.$ = Zepto);
 
+  //events
+  ;(function($) {
+    var _zid = 1, undefined,
+        slice = Array.prototype.slice,
+        isFunction = $.isFunction,
+        isString = function(obj) { return typeof obj == 'string' },
+        handlers = {},
+        specialEvents = {},
+        focusinSupported = 'onfocusin' in window,
+        focus = { focus: 'focusin', blur: 'focusout' },
+        hover = { mouseenter: 'mouseover', mouseleave: 'mouseout' };
+
+    specialEvents.click = specialEvents.mousedown = specialEvents.mouseup = specialEvents.mousemove = 'MouseEvents';
+
+    function zid(element) {
+      return element._zid || (element._zid = _zid++);
+    }
+
+    function findHandlers(element, event, fn, selector) {
+      event = parse(event);
+
+      if (event.ns) {
+        var match = matcherFor(event.ns);
+      }
+      return (handlers[zid(element)] || []).filter(function(handler) {
+        return handler
+            && (!event.e || handler.e == event.e)
+            && (!event.ns || matcher.test(handler.ns))
+            && (!fn || zid(handler.fn) === zid(fn))
+            && (!selector || handler.sel == selector)
+      })
+    }
+
+    function parse(event) {
+      var parts = ('' + event).split('.');
+      return {e: parts[0], ns: parts.slice(1).sort().join(' ')}
+    }
+
+
+    function matcherFor(ns) {
+      return new RegExp('(?:^|)' + ns.replace(' ', ' .* ?') + '(?: |$)')
+    }
+
+    function eventCapture(handler, captureSetting) {
+      return handler.del &&
+        (!focusinSupported && (handler.e in focus)) ||
+        !!captureSetting
+    }
+
+    function realEvent(type) {
+      return hover[type] || (focusinSupported && focus[type]) || type;
+    }
+
+    function add(element, events, fn, data, selector, delegator, capture) {
+      var id = zid(element), set = (handlers[id] || (handlers[id] = []));
+      events.split(/\s/).forEach(function(event) {
+        if (event == 'ready') {
+          return $(document).ready(fn);
+        }
+        var handler = parse(event);
+        handler.fn = fn;
+        handler.sel = selector;
+        if (handler.e in hover) {
+          var related = e.relatedTarget;
+          if (!related || (related !== this && !$.contains(this, related))) {
+            return handler.fn.apply(this, arguments);
+          }
+        }
+
+        handler.del = delegator;
+        var callback = delegator || fn;
+        handler.proxy = function(e) {
+          e = compatible(e);
+          if (e.isImmediatePropagationStopped()) {
+            return;
+          }
+          e.data = data;
+          var result = callback.apply(element, e._args == undefined ? [e] : [e].concat(e._args));
+          if (return === false) {
+            e.preventDefault(), e.stopPropagation()
+          }
+          return result;
+        }
+        handler.i = set.length;
+        set.push(handler)
+        if ('addEventListener' in element) {
+          element.addEventListener(realEvent(handler.e), handler.proxy, eventCapture(handler, capture));
+        }
+      })
+    }
+
+  })(Zepto)
 
 
 }))

@@ -18,6 +18,8 @@
             toString = obj.toString;  
   
   
+3. $ 实现的方法, 创建一构造函数 Z(), Z.prototype = $.fn; 给用 $ 获取的对象添加了方法和属性
+
 3. window.getComputedStyle(elem[, pseudoEle]).property    
     获取元素计算后的样式  
   
@@ -46,6 +48,7 @@
 19. ele.childNodes    
     获得子级元素, 包括空格/换行符, 标签, 注释  
   
+20. ele.style.width = '20px'; ele.style.cssText = 'width: 20px; height: 20px';
 
 20. innerHTML
     
@@ -83,17 +86,11 @@
 14. 运算优先级  
 
     && 都为真时, 值为最后一个真值, 有一个假值时, 值为那个假值
-    || 都为假时, 值为最后一个假值, 有一个真值时, 值为那个真值, 碰到真值时, 停止往下计算
+    || 都为假时, 值为最后一个假值, 有一个真值时, 值为那个真值,  || 前面值为真时, 停止往下计, 值为那个真值
 
-    var test1 = a || b;  a 为 false || 0 || undefined || null 时, test1 => b; 否则 test1 => a
-    var test2 = a && b;  a 为 true  || 非0 数 || string 时, test2 => b; 否则 test2 = a;
-    var test3 = true || any && any test3 => 第一个值
-    
-    a || b ? c : d
-    先运算 ? 前的值, 再进行 ? : 取值
-    
+    a || b ? c : d 先运算 ? 前的值, 再进行 ? : 取值
 
-    var test = a ? b : c
-    先进行a ? b : c 后进行 = 运算  
+    var test = a ? b : c 先进行a ? b : c 后进行 = 运算  
+    
 
 15. 通过构造函数创建的是一个对象

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <title>test</title>
+  </head>
+  <body>
+       <div class="cls1 cls2 cls3">
+        class
+    </div>
+       <div class="cls1 cls2 cls3">
+        class
+    </div>
+    <script src="zepto.js"></script>
+    <script src="test.js"></script>
+    <script type="text/javascript">
+var cll = $('.cls1');
+console.log(cll);
+console.log($);
+console.log($.browser.chrome);
+        var cls = document.getElementsByClassName('cls1');
+        console.log(cls[0].className);
+        var kls = $('.cls1').removeClass('cls2');
+    </script>
+      </body>
+</html>
