@@ -31,6 +31,7 @@
   //如果$未被使用,那么定义$
   window.$ === undefined && (window.$ = Zepto)//942
 
+
   //event
   ;(function($){})(Zepto)//944-1214
 
